@@ -1,0 +1,45 @@
+#!/bin/bash
+
+echo "THIS WILL REBUILD AND REINSTALL ANY AND ALL ISSUES TO DO WITH THE RTL8812BU WIRELESS LINUX DRIVER!";
+
+ifconfig && ip link  
+lsusb | grep '802.11ac NIC'
+lsmod
+lspci && lspci | grep Network
+dmesg
+rfkill list && sudo  rfkill unblock wifi
+
+	sudo lshw -C network | grep driver
+
+sudo apt-get install firmware-b43-installer && sudo apt-get install broadcom-sta-source broadcom-sta-dkms broadcom-sta-common && sudo apt-get purge bcmwl-kernel-source && sudo apt-get install --reinstall bcmwl-kernel-source
+
+# git clone https://github.com/fastoe/RTL8812BU_for_Raspbian.git
+
+sudo apt update
+sudo apt -y install dkms git bc
+cd /opt && sudo git clone https://github.com/fastoe/RTL8812BU.git
+cd RTL8812BU
+VER=$(sed -n 's/\PACKAGE_VERSION="\(.*\)"/\1/p' dkms.conf)
+sudo rsync -rvhP ./ /usr/src/rtl88x2bu-${VER}
+sudo dkms add -m rtl88x2bu -v ${VER}
+sudo dkms build -m rtl88x2bu -v ${VER}
+sudo dkms install -m rtl88x2bu -v ${VER}
+sudo modprobe 88x2bu
+sudo reboot
+
+
+# configure for monitor mode
+sed -i 's/CONFIG_80211W = n/CONFIG_80211W = y/' Makefile
+sed -i 's/CONFIG_WIFI_MONITOR = n/CONFIG_WIFI_MONITOR = y/' Makefile
+
+make
+sudo make install
+sudo ifconfig wlx1cbfcea97791 down
+sudo iwconfig wlx1cbfcea97791 mode monitor
+sudo ifconfig wlx1cbfcea97791 up
+
+
+# disable power saving mode (rPi) 
+sudo modprobe -r 88x2bu
+sudo modprobe 88x2bu rtw_power_mgnt=0 rtw_ips_mode=0 rtw_enusbss=0
+sudo echo "options 88x2bu rtw_power_mgnt=0 rtw_ips_mode=0 rtw_enusbss=0" | sudo tee /etc/modprobe.d/88x2bu.conf
